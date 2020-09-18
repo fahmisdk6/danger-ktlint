@@ -25,14 +25,14 @@ module Danger
     # Will fail if `ktlint` is not installed
     # Skip lint task if files changed are empty
     # @return [void]
-    # def lint(iles: [], inline_mode: false)
-    def lint(files: [], inline_mode: false)
+    # def lint(files: nil, inline_mode: false)
+    def lint(files: nil, inline_mode: false)
       unless ktlint_exists?
         fail("Couldn't find ktlint command. Install first.")
         return
       end
 
-      files = git.added_files + git.modified_files if files.empty?
+      files ||= git.added_files + git.modified_files
       targets = target_files(files)
       return if targets.empty?
 
