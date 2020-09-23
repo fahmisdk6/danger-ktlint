@@ -25,8 +25,8 @@ module Danger
     # Will fail if `ktlint` is not installed
     # Skip lint task if files changed are empty
     # @return [void]
-    # def lint(files: nil, inline_mode: false)
-    def lint(files: nil, inline_mode: false)
+    # def lint(files: nil, inline_mode: false, select_block)
+    def lint(files: nil, inline_mode: false, &select_block)
       unless ktlint_exists?
         fail("Couldn't find ktlint command. Install first.")
         return
@@ -37,6 +37,11 @@ module Danger
       return if targets.empty?
 
       results = JSON.parse(`ktlint #{targets.join(' ')} --reporter=json --relative`)
+
+      if select_block && !results.empty?
+        results = results.select { |result| select_block.call(result) }
+      end
+
       return if results.empty?
 
       if inline_mode
@@ -84,7 +89,6 @@ module Danger
     def send_inline_comments(results)
       catch(:loop_break) do
         count = 0
-        print "\nresults : #{results}\n"
         results.each do |result|
           result['errors'].each do |error|
             file = result['file']
