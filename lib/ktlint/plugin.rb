@@ -84,6 +84,7 @@ module Danger
     def send_inline_comments(results)
       catch(:loop_break) do
         count = 0
+        print "\nresults : #{results}\n"
         results.each do |result|
           result['errors'].each do |error|
             file = result['file']
