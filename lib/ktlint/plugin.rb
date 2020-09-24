@@ -38,6 +38,23 @@ module Danger
 
       results = JSON.parse(`ktlint #{targets.join(' ')} --reporter=json --relative`)
 
+      # restructure the JSON
+      new_result = []
+      results.each do |result|
+        file = result['file']
+        errors = result['errors']
+        errors.each do |error|
+          r = {
+              "file" => file,
+              "line" => error['line'],
+              "column" => error['column'],
+              "message" => error['message'],
+              "rule" => error['rule']
+          }
+          new_result.push(r)
+        end
+      end
+      results = new_result
       if select_block && !results.empty?
         results = results.select { |result| select_block.call(result) }
       end
@@ -53,33 +70,34 @@ module Danger
 
     # Comment to a PR by ktlint result json
     #
-    # // Sample ktlint result
-    # [
+    # // Sample restructured ktlin result
+    # [ 
     #   {
-    #     "file": "app/src/main/java/com/mataku/Model.kt",
-    # 		"errors": [
-    # 			{
-    # 				"line": 46,
-    # 				"column": 1,
-    # 				"message": "Unexpected blank line(s) before \"}\"",
-    # 				"rule": "no-blank-line-before-rbrace"
-    # 			}
-    # 		]
-    # 	}
+    #     "file" => "/src/main/java/com/mataku/Model.kt",
+    #     "line" => 46,
+    #     "column" => 1,
+    #     "message" => "Unexpected blank line(s) before \"}\"",
+    #   "rule" => "no-blank-line-before-rbrace"
+    #   },
+    #   {
+    #       "file" => "/src/main/java/com/mataku/Model.kt",
+    #       "line" => 46,
+    #       "column" => 1,
+    #       "message" => "Unexpected blank line(s) before \"}\"",
+    #     "rule" => "no-blank-line-before-rbrace"
+    #   }
     # ]
     def send_markdown_comment(results)
       catch(:loop_break) do
         count = 0
         results.each do |result|
-          result['errors'].each do |error|
-            file = "#{result['file']}#L#{error['line']}"
-            message = "#{github.html_link(file)}: #{error['message']}"
-            fail(message)
-            unless limit.nil?
-              count += 1
-              if count >= limit
-                throw(:loop_break)
-              end
+          file = "#{result['file']}#L#{result['line']}"
+          message = "#{github.html_link(file)}: #{result['message']}"
+          fail(message)
+          unless limit.nil?
+            count += 1
+            if count >= limit
+              throw(:loop_break)
             end
           end
         end
@@ -90,16 +108,14 @@ module Danger
       catch(:loop_break) do
         count = 0
         results.each do |result|
-          result['errors'].each do |error|
-            file = result['file']
-            message = error['message']
-            line = error['line']
-            fail(message, file: result['file'], line: line)
-            unless limit.nil?
-              count += 1
-              if count >= limit
-                throw(:loop_break)
-              end
+          file = result['file']
+          message = result['message']
+          line = result['line']
+          fail(message, file: result['file'], line: line)
+          unless limit.nil?
+            count += 1
+            if count >= limit
+              throw(:loop_break)
             end
           end
         end
