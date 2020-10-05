@@ -92,7 +92,7 @@ module Danger
         count = 0
         results.each do |result|
           file = "#{result['file']}#L#{result['line']}"
-          message = "#{github.html_link(file)}: #{result['message']}"
+          message = "#{file}: #{result['message']}"
           fail(message)
           unless limit.nil?
             count += 1
