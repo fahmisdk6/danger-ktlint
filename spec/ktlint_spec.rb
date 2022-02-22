@@ -148,5 +148,26 @@ module Danger
         end
       end
     end
+
+    describe 'lint with select box' do 
+      before do
+        allow_any_instance_of(Danger::DangerfileGitPlugin).to receive(:added_files).and_return(['app/src/main/java/com/mataku/Model.kt'])
+        allow_any_instance_of(Danger::DangerfileGitPlugin).to receive(:modified_files).and_return([])
+        allow_any_instance_of(Kernel).to receive(:system).with('which ktlint > /dev/null 2>&1').and_return(true)
+        allow_any_instance_of(Kernel).to receive(:`).with('ktlint app/src/main/java/com/mataku/Model.kt --reporter=json --relative').and_return(dummy_ktlint_result)
+        allow_any_instance_of(Danger::DangerfileGitHubPlugin).to receive(:html_link).with('app/src/main/java/com/mataku/Model.kt#L46').and_return("<a href='https://github.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model.kt'>Model.kt</a>")
+        expect_any_instance_of(Danger::DangerfileGitHubPlugin).not_to receive(:html_link).with('app/src/main/java/com/mataku/Model.kt#L47').and_return("<a href='https://github.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model.kt'>Model.kt</a>")
+      end
+
+      context 'select box is set' do
+        it 'filter out results from Model.kt line 47' do
+          plugin.lint(inline_mode: true) do |result|
+            file_modelkt = result['file'] == 'app/src/main/java/com/mataku/Model.kt'
+            line47 = result['errors'].any? { |error| error['line'] == 47 }
+            !file_modelkt && !line_47
+          end
+        end
+      end
+    end
   end
 end

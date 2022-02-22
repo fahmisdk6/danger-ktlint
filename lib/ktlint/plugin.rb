@@ -35,18 +35,37 @@ module Danger
     # Will fail if `ktlint` is not installed
     # Skip lint task if files changed are empty
     # @return [void]
-    # def lint(inline_mode: false)
-    def lint(inline_mode: false)
+    def lint(files: [], inline_mode: false, &select_block)
       unless supported_service?
         raise UnsupportedServiceError.new
       end
 
-      targets = target_files(git.added_files + git.modified_files)
+      files ||= git.added_files + git.modified_files
+      targets = target_files(files)
+      return if targets.empty?
 
       results = ktlint_results(targets)
-      if results.nil? || results.empty?
-        return
+      return if results.nil? || results.empty?
+
+      # restructure the JSON
+      new_result = []
+      results.each do |result|
+        file = result['file']
+        errors = result['errors']
+        errors.each do |error|
+          r = {
+              "file" => file,
+              "line" => error['line'],
+              "column" => error['column'],
+              "message" => error['message'],
+              "rule" => error['rule']
+          }
+          new_result.push(r)
+        end
       end
+
+      results = new_result
+      results = results.filter { |result| select_block.call(result) } if select_block
 
       if inline_mode
         send_inline_comments(results, targets)
@@ -57,19 +76,22 @@ module Danger
 
     # Comment to a PR by ktlint result json
     #
-    # // Sample single ktlint result
-    # [
+    # // Sample restructured ktlin result
+    # [ 
     #   {
-    #     "file": "app/src/main/java/com/mataku/Model.kt",
-    # 		"errors": [
-    # 			{
-    # 				"line": 46,
-    # 				"column": 1,
-    # 				"message": "Unexpected blank line(s) before \"}\"",
-    # 				"rule": "no-blank-line-before-rbrace"
-    # 			}
-    # 		]
-    # 	}
+    #     "file" => "/src/main/java/com/mataku/Model.kt",
+    #     "line" => 46,
+    #     "column" => 1,
+    #     "message" => "Unexpected blank line(s) before \"}\"",
+    #   "rule" => "no-blank-line-before-rbrace"
+    #   },
+    #   {
+    #       "file" => "/src/main/java/com/mataku/Model.kt",
+    #       "line" => 46,
+    #       "column" => 1,
+    #       "message" => "Unexpected blank line(s) before \"}\"",
+    #     "rule" => "no-blank-line-before-rbrace"
+    #   }
     # ]
     def send_markdown_comment(ktlint_results, targets)
       catch(:loop_break) do
@@ -118,7 +140,7 @@ module Danger
     end
 
     def target_files(changed_files)
-      changed_files.select do |file|
+      changed_files.filter do |file|
         file.end_with?('.kt')
       end
     end
@@ -156,9 +178,7 @@ module Danger
       if skip_lint
         # TODO: Allow XML
         ktlint_result_files.map do |file|
-          File.open(file) do |f|
-            JSON.load(f)
-          end
+          JSON.load(File.read(file, encoding: 'UTF-8'))
         end
       else
         unless ktlint_exists?
@@ -177,10 +197,10 @@ module Danger
     end
 
     def ktlint_result_files
-      if !report_file.nil? && !report_file.empty? && File.exists?(report_file)
+      if !report_file.to_s.strip.empty? && File.exists?(report_file)
         [report_file]
       elsif !report_files_pattern.nil? && !report_files_pattern.empty?
-        Dir.glob(report_files_pattern)
+        Dir[report_files_pattern]
       else
         fail("Couldn't find ktlint result json file.\nYou must specify it with `ktlint.report_file=...` or `ktlint.report_files_pattern=...` in your Dangerfile.")
       end
