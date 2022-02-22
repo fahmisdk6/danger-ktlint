@@ -47,24 +47,18 @@ module Danger
       results = ktlint_results(targets)
       return if results.nil? || results.empty?
 
-      # restructure the JSON
-      new_result = []
-      results.each do |result|
-        file = result['file']
-        errors = result['errors']
-        errors.each do |error|
-          r = {
-              "file" => file,
-              "line" => error['line'],
-              "column" => error['column'],
-              "message" => error['message'],
-              "rule" => error['rule']
+      # Restructured ktlint result
+      results = results.reduce([]) do |acc, result|
+        acc + result['errors'].map do |error|
+          {
+            'file' => result['file'],
+            'line' => error['line'],
+            'column' => error['column'],
+            'message' => error['message'],
+            'rule' => error['rule']
           }
-          new_result.push(r)
         end
       end
-
-      results = new_result
       results = results.filter { |result| select_block.call(result) } if select_block
 
       if inline_mode
@@ -74,9 +68,6 @@ module Danger
       end
     end
 
-    # Comment to a PR by ktlint result json
-    #
-    # // Sample restructured ktlin result
     # [ 
     #   {
     #     "file" => "/src/main/java/com/mataku/Model.kt",
@@ -84,30 +75,21 @@ module Danger
     #     "column" => 1,
     #     "message" => "Unexpected blank line(s) before \"}\"",
     #   "rule" => "no-blank-line-before-rbrace"
-    #   },
-    #   {
-    #       "file" => "/src/main/java/com/mataku/Model.kt",
-    #       "line" => 46,
-    #       "column" => 1,
-    #       "message" => "Unexpected blank line(s) before \"}\"",
-    #     "rule" => "no-blank-line-before-rbrace"
     #   }
     # ]
     def send_markdown_comment(results, targets)
       catch(:loop_break) do
         count = 0
         results.each do |result|
-          result['errors'].each do |error|
-            file_path = relative_file_path(result['file'])
-            next unless targets.include?(file_path)
+          file_path = relative_file_path(result['file'])
+          next unless targets.include?(file_path)
 
-            message = "#{file_html_link(file_path, error['line'])}: #{error['message']}"
-            fail(message)
-            unless limit.nil?
-              count += 1
-              if count >= limit
-                throw(:loop_break)
-              end
+          message = "#{file_html_link(file_path, result['line'])}: #{result['message']}"
+          fail(message)
+          unless limit.nil?
+            count += 1
+            if count >= limit
+              throw(:loop_break)
             end
           end
         end
@@ -118,17 +100,17 @@ module Danger
       catch(:loop_break) do
         count = 0
         results.each do |result|
-          result['errors'].each do |error|
-            file_path = relative_file_path(result['file'])
-            next unless targets.include?(file_path)
-            message = error['message']
-            line = error['line']
-            fail(message, file: result['file'], line: line)
-            unless limit.nil?
-              count += 1
-              if count >= limit
-                throw(:loop_break)
-              end
+          file_path = relative_file_path(result['file'])
+          next unless targets.include?(file_path)
+
+          message = result['message']
+          line = result['line']
+          # Why not file_path?
+          fail(message, file: result['file'], line: line)
+          unless limit.nil?
+            count += 1
+            if count >= limit
+              throw(:loop_break)
             end
           end
         end
@@ -136,9 +118,7 @@ module Danger
     end
 
     def target_files(changed_files)
-      changed_files.filter do |file|
-        file.end_with?('.kt')
-      end
+      changed_files.filter { |file| file.end_with?('.kt') }
     end
 
     # Make it a relative path so it can compare it to git.added_files
@@ -166,7 +146,7 @@ module Danger
       @pwd ||= `pwd`.chomp
     end
 
-    def ktlint_exists?
+    def ktlint_installed?
       system 'which ktlint > /dev/null 2>&1' 
     end
 
@@ -185,7 +165,7 @@ module Danger
 
         JSON.load(File.read(report_file, encoding: 'UTF-8'))
       else
-        unless ktlint_exists?
+        unless ktlint_installed?
           fail("Couldn't find ktlint command. Install first.")
           return
         end
