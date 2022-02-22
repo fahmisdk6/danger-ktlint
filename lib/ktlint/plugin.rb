@@ -1,18 +1,18 @@
 # frozen_string_literal: true
 
-require 'json'
+require "json"
 
 module Danger
   class DangerKtlint < Plugin
     class UnexpectedLimitTypeError < StandardError; end
 
     class UnsupportedServiceError < StandardError
-      def initialize(message = 'Unsupported service! Currently supported services are GitHub, GitLab and BitBucket server.')
+      def initialize(message = "Unsupported service! Currently supported services are GitHub, GitLab and BitBucket server.")
         super(message)
       end
     end
 
-    AVAILABLE_SERVICES = [:github, :gitlab, :bitbucket_server]
+    AVAILABLE_SERVICES = %i(github gitlab bitbucket_server).freeze
 
     # TODO: Lint all files if `filtering: false`
     attr_accessor :filtering
@@ -24,7 +24,7 @@ module Danger
     end
 
     def limit=(limit)
-      if limit != nil && limit.integer?
+      if !limit.nil? && limit.integer?
         @limit = limit
       else
         raise UnexpectedLimitTypeError
@@ -37,7 +37,7 @@ module Danger
     # @return [void]
     def lint(files: [], inline_mode: false, &select_block)
       unless supported_service?
-        raise UnsupportedServiceError.new
+        raise UnsupportedServiceError
       end
 
       files ||= git.added_files + git.modified_files
@@ -49,13 +49,13 @@ module Danger
 
       # Restructured ktlint result
       results = results.reduce([]) do |acc, result|
-        acc + result['errors'].map do |error|
+        acc + result["errors"].map do |error|
           {
-            'file' => result['file'],
-            'line' => error['line'],
-            'column' => error['column'],
-            'message' => error['message'],
-            'rule' => error['rule']
+            "file" => result["file"],
+            "line" => error["line"],
+            "column" => error["column"],
+            "message" => error["message"],
+            "rule" => error["rule"]
           }
         end
       end
@@ -68,7 +68,7 @@ module Danger
       end
     end
 
-    # [ 
+    # [
     #   {
     #     "file" => "/src/main/java/com/mataku/Model.kt",
     #     "line" => 46,
@@ -81,16 +81,16 @@ module Danger
       catch(:loop_break) do
         count = 0
         results.each do |result|
-          file_path = relative_file_path(result['file'])
+          file_path = relative_file_path(result["file"])
           next unless targets.include?(file_path)
 
           message = "#{file_html_link(file_path, result['line'])}: #{result['message']}"
           fail(message)
-          unless limit.nil?
-            count += 1
-            if count >= limit
-              throw(:loop_break)
-            end
+          next if limit.nil?
+
+          count += 1
+          if count >= limit
+            throw(:loop_break)
           end
         end
       end
@@ -100,30 +100,29 @@ module Danger
       catch(:loop_break) do
         count = 0
         results.each do |result|
-          file_path = relative_file_path(result['file'])
+          file_path = relative_file_path(result["file"])
           next unless targets.include?(file_path)
 
-          message = result['message']
-          line = result['line']
-          # Why not file_path?
-          fail(message, file: result['file'], line: line)
-          unless limit.nil?
-            count += 1
-            if count >= limit
-              throw(:loop_break)
-            end
+          message = result["message"]
+          line = result["line"]
+          fail(message, file: result["file"], line: line)
+          next if limit.nil?
+
+          count += 1
+          if count >= limit
+            throw(:loop_break)
           end
         end
       end
     end
 
     def target_files(changed_files)
-      changed_files.filter { |file| file.end_with?('.kt') }
+      changed_files.filter { |file| file.end_with?(".kt") }
     end
 
     # Make it a relative path so it can compare it to git.added_files
     def relative_file_path(file_path)
-      file_path.gsub(/#{pwd}\//, '')
+      file_path.gsub(%r{#{pwd}/}, "")
     end
 
     private
@@ -138,16 +137,18 @@ module Danger
     end
 
     # `eval` may be dangerous, but it does not accept any input because it accepts only defined as danger.scm_provider
+    # rubocop:disable Security/Eval
     def scm_provider_klass
       @scm_provider_klass ||= eval(danger.scm_provider.to_s)
     end
+    # rubocop:enable Security/Eval
 
     def pwd
       @pwd ||= `pwd`.chomp
     end
 
     def ktlint_installed?
-      system 'which ktlint > /dev/null 2>&1' 
+      system "which ktlint > /dev/null 2>&1"
     end
 
     def ktlint_results(targets)
@@ -158,12 +159,12 @@ module Danger
           return
         end
 
-        unless File.exists?(report_file)
+        unless File.exist?(report_file)
           fail("Couldn't find ktlint result json file.\nYou must specify it with `ktlint.report_file=...` in your Dangerfile.")
           return
         end
 
-        JSON.load(File.read(report_file, encoding: 'UTF-8'))
+        JSON.parse(File.read(report_file, encoding: "UTF-8"))
       else
         unless ktlint_installed?
           fail("Couldn't find ktlint command. Install first.")
@@ -172,7 +173,7 @@ module Danger
 
         return if targets.empty?
 
-        JSON.parse(`ktlint #{targets.join(' ')} --reporter=json --relative`)
+        JSON.parse(`ktlint #{targets.join(" ")} --reporter=json --relative`)
       end
     end
 
