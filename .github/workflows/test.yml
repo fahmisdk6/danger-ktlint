@@ -16,4 +16,3 @@ jobs:
     - name: Run spec
       run: |
         bundle exec rspec spec
-

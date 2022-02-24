@@ -3,6 +3,16 @@ ROOT = Pathname.new(File.expand_path("../../", __FILE__))
 $:.unshift((ROOT + "lib").to_s)
 $:.unshift((ROOT + "spec").to_s)
 
+require "simplecov"
+SimpleCov.start do
+  enable_coverage :branch
+end
+
+if ENV["CI"] == "true"
+  require "codecov"
+  SimpleCov.formatter = SimpleCov::Formatter::Codecov
+end
+
 require "bundler/setup"
 require "pry"
 
