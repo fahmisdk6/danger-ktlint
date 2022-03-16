@@ -1,7 +1,7 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'ktlint/gem_version.rb'
+require 'gem_version'
 
 Gem::Specification.new do |spec|
   spec.name          = 'danger-ktlint'
@@ -21,19 +21,21 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'danger-plugin-api', '~> 1.0'
 
   # General ruby development
-  spec.add_development_dependency 'bundler', '~> 2.0'
+  spec.add_development_dependency 'bundler', '~> 2.1.4'
+  spec.add_development_dependency 'codecov', '~> 0.6.0'
   spec.add_development_dependency 'rake'
 
   # Testing support
-  spec.add_development_dependency 'rspec', '~> 3.4'
+  spec.add_development_dependency 'rspec', '~> 3.11.0'
 
   # Linting code and docs
-  spec.add_development_dependency "rubocop"
+  spec.add_development_dependency 'rubocop'
 
   # Makes testing easy via `bundle exec guard`
-  spec.add_development_dependency 'guard', '~> 2.14'
-  spec.add_development_dependency 'guard-rspec', '~> 4.7'
+  spec.add_development_dependency 'guard', '~> 2.18.0'
+  spec.add_development_dependency 'guard-rspec', '~> 4.7.3'
 
   spec.add_development_dependency 'pry'
+  spec.add_development_dependency 'simplecov', '~> 0.21.2'
   spec.add_development_dependency 'yard'
 end
