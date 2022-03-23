@@ -1,5 +1,5 @@
 require "pathname"
-ROOT = Pathname.new(File.expand_path("../../", __FILE__))
+ROOT = Pathname.new(File.expand_path("..", __dir__))
 $:.unshift((ROOT + "lib").to_s)
 $:.unshift((ROOT + "spec").to_s)
 
@@ -19,7 +19,7 @@ require "pry"
 require "rspec"
 require "danger"
 
-if `git remote -v` == ''
+if `git remote -v`.empty?
   puts "You cannot run tests without setting a local git remote on this repo"
   puts "It's a weird side-effect of Danger's internals."
   exit(0)
@@ -74,6 +74,17 @@ def testing_env_for_gitlab
   }
 end
 
+def testing_env_for_bitbucket
+  {
+    "BITRISE_PULL_REQUEST" => "4",
+    "BITRISE_IO" => "true",
+    "DANGER_BITBUCKETSERVER_USERNAME" => "user",
+    "DANGER_BITBUCKETSERVER_PASSWORD" => "password",
+    "DANGER_BITBUCKETSERVER_HOST" => "bitbucket.org",
+    "GIT_REPOSITORY_URL" => "git@bitbucket.org:artsy/eigen"
+  }
+end
+
 # A stubbed out Dangerfile for use in tests
 def testing_dangerfile
   env = Danger::EnvironmentManager.new(testing_env)
@@ -85,12 +96,15 @@ def testing_dangerfile_for_gitlab
   Danger::Dangerfile.new(env, testing_ui)
 end
 
+def testing_dangerfile_for_bitbucket
+  env = Danger::EnvironmentManager.new(testing_env_for_bitbucket)
+  Danger::Dangerfile.new(env, testing_ui)
+end
+
 def dummy_ktlint_result
-  File.read(File.expand_path('../fixtures/ktlint_result.json', __FILE__)).chomp
+  File.read(File.expand_path("fixtures/ktlint_result.json", __dir__)).chomp
 end
 
 def dummy_ktlint_result_2
-  File.read(File.expand_path('../fixtures/ktlint_result_2.json', __FILE__)).chomp
+  File.read(File.expand_path("fixtures/ktlint_result_2.json", __dir__)).chomp
 end
-
-

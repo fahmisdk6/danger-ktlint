@@ -11,12 +11,12 @@ module Danger
       end
     end
 
-    SUPPORTED_SERVICES = %w(GitHub GitLab BitBucket).freeze
-    AVAILABLE_SERVICES = SUPPORTED_SERVICES.map { |service| service.downcase.to_sym }
+    SUPPORTED_SERVICES = ["GitHub", "GitLab", "BitBucket server"].freeze
+    AVAILABLE_SERVICES = SUPPORTED_SERVICES.map { |service| service.split.join("_").downcase.to_sym }
 
     # Throw error for unsupported scm service
     class UnsupportedServiceError < StandardError
-      def initialize(message = "Unsupported service! Currently supported services are #{SUPPORTED_SERVICES.join(',')} server.")
+      def initialize(message = "Unsupported service! Currently supported services are #{SUPPORTED_SERVICES.join(',')}.")
         super(message)
       end
     end
@@ -24,7 +24,7 @@ module Danger
     # Lint all files on `filtering: false`
     attr_accessor :filtering
 
-    attr_accessor :skip_lint, :report_file, :report_files_pattern, :limit
+    attr_accessor :report_file, :report_files_pattern, :limit
 
     # Run ktlint task using command line interface
     # Will fail if `ktlint` is not installed
@@ -125,7 +125,8 @@ module Danger
     end
 
     def file_html_link(file_path, line_number)
-      file = if danger.scm_provider == :github
+      supported_file_link_link_provider = %i(gitlab github)
+      file = if supported_file_link_link_provider.any? { |provider| provider == danger.scm_provider }
                "#{file_path}#L#{line_number}"
              else
                file_path
@@ -144,31 +145,11 @@ module Danger
       system "which ktlint > /dev/null 2>&1"
     end
 
+    # Will skip lint by default if report file is set
     def ktlint_results(targets)
-      if skip_lint
-        # TODO: Allow XML (will require nokogiri)
-        ktlint_result_files.map do |file|
-          JSON.parse(File.read(file, encoding: "UTF-8"))
-        end
-      else
-        unless ktlint_installed?
-          fail("Couldn't find ktlint command. Install first.")
-          return
-        end
-
-        filtering = true if filtering.nil?
-        ktlint_targets = filtering ? targets.join(" ") : "**/*.kt"
-        return if ktlint_targets.empty?
-
-        # On latest kotlint there is debug log, instead of just the json report
-        # 10:47:20.076 [main] DEBUG com.pinterest.ktlint.Main - Discovered
-        # Maybe can transform to
-        # ktlint_result = `ktlint #{ktlint_targets} --reporter=json --relative`
-        # report = ktlint_result.split("\n").map { |line| next line unless line.match?(/^\d+:.*/) }.compact.join("\n")
-        # JSON.parse(report)
-        report_file_path = "ktlint_report.json"
-        system "ktlint #{ktlint_targets} --reporter=json,output=#{report_file_path} --relative"
-        [JSON.parse(File.read(report_file_path, encoding: "utf-8"))]
+      # TODO: Allow XML (will require nokogiri)
+      ktlint_result_files(targets).map do |file|
+        JSON.parse(File.read(file, encoding: "utf-8"))
       end
     end
 
@@ -176,14 +157,40 @@ module Danger
       AVAILABLE_SERVICES.include?(danger.scm_provider.to_sym)
     end
 
-    def ktlint_result_files
-      if !report_file.to_s.strip.empty? && File.exist?(report_file)
-        [report_file]
-      elsif !report_files_pattern.to_s.strip.empty?
-        Dir[report_files_pattern]
+    def run_ktlint(targets)
+      filtering = true if filtering.nil?
+      ktlint_targets = filtering ? targets.join(" ") : "**/*.kt"
+      return if ktlint_targets.empty?
+
+      # On latest kotlint there is debug log, instead of just the json report
+      # 10:47:20.076 [main] DEBUG com.pinterest.ktlint.Main - Discovered
+      # So we need to use file instead of backtick (`)
+      report_file_path = "ktlint_report.json"
+      system "ktlint #{ktlint_targets} --reporter=json,output=#{report_file_path} --relative"
+      report_file_path
+    end
+
+    def ktlint_result_files(targets)
+      skip_lint = [report_file, report_files_pattern].any?
+      if skip_lint
+        if !report_file.to_s.strip.empty? && File.exist?(report_file)
+          [report_file]
+        elsif !report_files_pattern.to_s.strip.empty?
+          Dir[report_files_pattern]
+        else
+          fail_message = "Couldn't find ktlint result json file.\n" \
+                         "You must specify it with `ktlint.report_file=...` or " \
+                         "`ktlint.report_files_pattern=...` in your Dangerfile."
+          fail fail_message
+          []
+        end
       else
-        fail("Couldn't find ktlint result json file.\nYou must specify it with `ktlint.report_file=...` or `ktlint.report_files_pattern=...` in your Dangerfile.")
-        []
+        if ktlint_installed?
+          [run_ktlint(targets)]
+        else
+          fail "Couldn't find ktlint command. Install first."
+          []
+        end
       end
     end
   end

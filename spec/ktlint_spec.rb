@@ -70,8 +70,25 @@ module Danger
           allow_any_instance_of(Kernel).to receive(:system).with("which ktlint > /dev/null 2>&1").and_return(true)
           allow_any_instance_of(Kernel).to receive(:system).with("ktlint app/src/main/java/com/mataku/Model.kt --reporter=json,output=ktlint_report.json --relative").and_return(true)
           allow(File).to receive(:read).with("ktlint_report.json", encoding: "utf-8").and_return(dummy_ktlint_result)
-          allow_any_instance_of(Danger::DangerfileGitLabPlugin).to receive(:html_link).with("app/src/main/java/com/mataku/Model.kt").and_return("<a href='https://gitlab.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model.kt'>Model.kt</a>")
-          allow_any_instance_of(Danger::DangerfileGitLabPlugin).to receive(:html_link).with("app/src/main/java/com/mataku/Model.kt").and_return("<a href='https://gitlab.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model.kt'>Model.kt</a>")
+          allow_any_instance_of(Danger::DangerfileGitLabPlugin).to receive(:html_link).with("app/src/main/java/com/mataku/Model.kt#L46").and_return("<a href='https://gitlab.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model.kt'>Model.kt</a>")
+          allow_any_instance_of(Danger::DangerfileGitLabPlugin).to receive(:html_link).with("app/src/main/java/com/mataku/Model.kt#L47").and_return("<a href='https://gitlab.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model.kt'>Model.kt</a>")
+        end
+
+        it do
+          plugin.lint
+          expect(dangerfile.status_report[:errors].size).to eq(2)
+        end
+      end
+
+      context "Bitbucket" do
+        let(:dangerfile) { testing_dangerfile_for_bitbucket }
+
+        before do
+          allow_any_instance_of(Kernel).to receive(:system).with("which ktlint > /dev/null 2>&1").and_return(true)
+          allow_any_instance_of(Kernel).to receive(:system).with("ktlint app/src/main/java/com/mataku/Model.kt --reporter=json,output=ktlint_report.json --relative").and_return(true)
+          allow(File).to receive(:read).with("ktlint_report.json", encoding: "utf-8").and_return(dummy_ktlint_result)
+          allow_any_instance_of(Danger::DangerfileBitbucketServerPlugin).to receive(:html_link).with("app/src/main/java/com/mataku/Model.kt").and_return("<a href='https://gitlab.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model.kt'>Model.kt</a>")
+          allow_any_instance_of(Danger::DangerfileBitbucketServerPlugin).to receive(:html_link).with("app/src/main/java/com/mataku/Model.kt").and_return("<a href='https://gitlab.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model.kt'>Model.kt</a>")
         end
 
         it do
@@ -118,7 +135,7 @@ module Danger
     end
 
     describe "#skip_lint" do
-      context "skip_lint: true" do
+      context "report_file path is specified" do
         before do
           allow_any_instance_of(Danger::DangerfileGitPlugin).to receive(:added_files).and_return(["app/src/main/java/com/mataku/Model.kt"])
           allow_any_instance_of(Danger::DangerfileGitPlugin).to receive(:modified_files).and_return([])
@@ -127,7 +144,6 @@ module Danger
 
           allow(plugin).to receive(:system).with("which ktlint > /dev/null 2>&1").and_return(true)
           plugin.report_file = "./spec/fixtures/ktlint_result.json"
-          plugin.skip_lint = true
         end
 
         it do
@@ -146,7 +162,6 @@ module Danger
           allow_any_instance_of(Danger::DangerfileGitHubPlugin).to receive(:html_link).with("app/src/main/java/com/mataku/Model2.kt#L47").and_return("<a href='https://gitlab.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model2.kt'>Model2.kt</a>")
           allow(plugin).to receive(:system).with("which ktlint > /dev/null 2>&1").and_return(true)
           plugin.report_files_pattern = "**/ktlint_result*.json"
-          plugin.skip_lint = true
         end
 
         it do
@@ -158,14 +173,10 @@ module Danger
     end
 
     describe "lint with select box" do
-      before do
-        plugin.skip_lint = true
-      end
-
-      context "report_file empty or not set" do
+      context "report_file, report_file_pattern is not set and ktlint is not installed" do
         it "should fail when lint" do
           plugin.lint(files: ["app/src/main/java/com/mataku/Model.kt"])
-          expect(dangerfile.status_report[:errors]).to eq(["Couldn't find ktlint result json file.\nYou must specify it with `ktlint.report_file=...` or `ktlint.report_files_pattern=...` in your Dangerfile."])
+          expect(dangerfile.status_report[:errors]).to eq(["Couldn't find ktlint command. Install first."])
         end
       end
 
@@ -188,10 +199,10 @@ module Danger
             allow_any_instance_of(Danger::DangerfileGitHubPlugin).to receive(:html_link).with("app/src/main/java/com/mataku/Model.kt#L47").and_return("<a href='https://github.com/mataku/android/blob/561827e46167077b5e53515b4b7349b8ae04610b/Model.kt'>Model.kt</a>")
           end
 
-          # it "should fail when lint" do
-          #   plugin.lint(files: ["app/src/main/java/com/mataku/Model.kt"])
-          #   expect(dangerfile.status_report[:errors].size).to eq(2)
-          # end
+          it "should fail when lint" do
+            plugin.lint(files: ["app/src/main/java/com/mataku/Model.kt"])
+            expect(dangerfile.status_report[:errors].size).to eq(2)
+          end
         end
       end
     end
