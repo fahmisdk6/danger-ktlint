@@ -126,7 +126,11 @@ module Danger
 
     def file_html_link(file_path, line_number)
       supported_file_link_link_provider = %i(gitlab github)
-      file = if supported_file_link_link_provider.any? { |provider| provider == danger.scm_provider }
+      
+      file = if supported_file_link_link_provider.any? { |provider| 
+        puts "file_html_link #{provider} #{danger.scm_provide}"
+        provider == danger.scm_provider 
+      }
                "#{file_path}#L#{line_number}"
              else
                file_path
